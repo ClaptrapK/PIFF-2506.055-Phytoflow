@@ -1,281 +1,437 @@
-
-import React, { useState } from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Animated, Easing, ScrollView } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useRef, useContext, createContext } from 'react';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  Animated,
+  Easing,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert
+} from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const Stack = createNativeStackNavigator();
 
+/* -------------------- Auth Context -------------------- */
+const AuthContext = createContext();
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const signIn = (email) => setUser({ name: 'Usuário Exemplo', email });
+  const signOut = () => setUser(null);
+  const updateProfile = (profile) => setUser((prev) => ({ ...prev, ...profile }));
+  return (
+    <AuthContext.Provider value={{ user, signIn, signOut, updateProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+/* -------------------- Reusable Components -------------------- */
+function Field({ label, value, onChange, placeholder, secure = false }) {
+  return (
+    <View style={ui.fieldWrap}>
+      {label ? <Text style={ui.fieldLabel}>{label}</Text> : null}
+      <TextInput
+        style={ui.input}
+        placeholder={placeholder}
+        value={value}
+        onChangeText={onChange}
+        secureTextEntry={secure}
+        placeholderTextColor="#6b776b"
+      />
+    </View>
+  );
+}
+
+function AppButton({ title, onPress, icon, style }) {
+  return (
+    <TouchableOpacity style={[ui.button, style]} onPress={onPress} activeOpacity={0.8}>
+      {icon ? <View style={ui.btnIcon}>{icon}</View> : null}
+      <Text style={ui.buttonText}>{title}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function Header({ title, onMenuPress }) {
+  return (
+    <View style={ui.header}>
+      <Text style={ui.headerTitle}>{title}</Text>
+      <TouchableOpacity onPress={onMenuPress} style={ui.headerIcon}>
+        <Ionicons name="person-circle" size={36} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* -------------------- Side Menu -------------------- */
+function SideMenu({ visible, onClose, onProfile, onSignOut }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(anim, {
+      toValue: visible ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [visible]);
+
+  const right = anim.interpolate({ inputRange: [0, 1], outputRange: [-220, 10] });
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[ui.menuContainer, { right }]}>
+      <View style={ui.menuCard}>
+        <TouchableOpacity style={ui.menuItem} onPress={() => { onProfile(); onClose(); }}>
+          <Ionicons name="person" size={20} color="#2b6e35" />
+          <Text style={ui.menuText}>Perfil</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={ui.menuItem} onPress={() => { onSignOut(); onClose(); }}>
+          <MaterialCommunityIcons name="logout" size={20} color="#2b6e35" />
+          <Text style={ui.menuText}>Sair</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
+/* -------------------- LOGIN SCREEN -------------------- */
 function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Login</Text>
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Senha" secureTextEntry value={password} onChangeText={setPassword} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Dashboard")}>
-        <Text style={styles.buttonText}>Entrar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-        <Text style={styles.linkText}>Criar conta</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+  const { signIn } = useContext(AuthContext);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-function RegisterScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [local, setLocal] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Cadastro</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Localização" value={local} onChangeText={setLocal} />
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Senha" secureTextEntry value={password} onChangeText={setPassword} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Login")}>
-        <Text style={styles.buttonText}>Registrar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function ProfileScreen({ navigation }) {
-  const [name, setName] = useState("Usuário Exemplo");
-  const [email, setEmail] = useState("usuario@email.com");
-  return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Perfil do Usuário</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} />
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} />
-      <TouchableOpacity style={styles.button} onPress={() => alert("Dados atualizados")}>
-        <Text style={styles.buttonText}>Salvar Alterações</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.menuButton} onPress={() => navigation.goBack()}>
-        <Text style={styles.menuText}>Voltar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function DashboardScreen({ navigation }) {
-  const [menuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useState(new Animated.Value(0))[0];
-
-  const toggleMenu = () => {
-    if(menuVisible){
-      Animated.timing(slideAnim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: false }).start();
-    } else {
-      Animated.timing(slideAnim, { toValue: 180, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: false }).start();
-    }
-    setMenuVisible(!menuVisible);
+  const handleLogin = () => {
+    if (!email || !password) return Alert.alert('Erro', 'Preencha email e senha');
+    signIn(email);
+    navigation.replace('Dashboard');
   };
 
-  const sensorData = [{ id: "1", soilMoisture: "32%", airTemp: "28°C", airHumidity: "60%", cultureCoef: "0.85", sapFlow: "2.4 L/h", timestamp: "2025-10-30 14:15" }];
-
   return (
-    <View style={styles.containerCenter}>
-      {/* Icone Perfil */}
-      <TouchableOpacity style={styles.profileIconRight} onPress={toggleMenu}>
-        <Ionicons name="person-circle" size={40} color="#4c8c4a" />
-      </TouchableOpacity>
-
-      {/* Side Menu acima dos cards */}
-      <Animated.View style={[styles.sideMenuRight, { right: slideAnim.interpolate({ inputRange: [0, 180], outputRange: [-180, 0] }), zIndex: 10 }]}>
-        <TouchableOpacity style={styles.menuItem} onPress={() => { toggleMenu(); navigation.navigate("Profile"); }}>
-          <Text style={styles.menuText}>Perfil</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Login")}>
-          <Text style={styles.menuText}>Sair</Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Título */}
-      <Text style={styles.titleDashboard}>Dados da Irrigação</Text>
-
-      <FlatList
-        contentContainerStyle={{ alignItems: "center", paddingTop: 20 }}
-        data={sensorData}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.infoCard}>
-            <Text>Umidade do Solo: {item.soilMoisture}</Text>
-            <Text>Temperatura do Ar: {item.airTemp}</Text>
-            <Text>Umidade Relativa do Ar: {item.airHumidity}</Text>
-            <Text>Coeficiente Cultural: {item.cultureCoef}</Text>
-            <Text>Fluxo de Seivas: {item.sapFlow}</Text>
-            <Text>Horário: {item.timestamp}</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={styles.centerColumn} keyboardShouldPersistTaps="handled">
+          <View style={styles.brandBox}>
+            <Ionicons name="water" size={48} color="#fff" />
+            <Text style={styles.brandTitle}>Phytoflow</Text>
+            <Text style={styles.brandSubtitle}>Monitoramento e Gestão de Áreas de Irrigação</Text>
           </View>
-        )}
+
+          <View style={styles.cardSmall}>
+            <Field placeholder="Email" value={email} onChange={setEmail} />
+            <Field placeholder="Senha" value={password} onChange={setPassword} secure />
+            <AppButton title="Entrar" onPress={handleLogin} icon={<Ionicons name="log-in" size={18} color="#fff" />} />
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} style={{ marginTop: 12 }}>
+              <Text style={styles.link}>Criar conta</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+/* -------------------- REGISTER SCREEN -------------------- */
+function RegisterScreen({ navigation }) {
+  const { signIn } = useContext(AuthContext);
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleRegister = () => {
+    if (!name || !email || !password) return Alert.alert('Erro', 'Preencha nome, email e senha');
+    signIn(email);
+    navigation.replace('Dashboard');
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={styles.centerColumn} keyboardShouldPersistTaps="handled">
+          <View style={styles.cardSmall}>
+            <Text style={styles.cardTitle}>Criar Conta</Text>
+            <Field label="Nome" value={name} onChange={setName} placeholder="Seu nome" />
+            <Field label="Localização" value={location} onChange={setLocation} placeholder="Cidade / Estado" />
+            <Field label="Email" value={email} onChange={setEmail} placeholder="email@exemplo.com" />
+            <Field label="Senha" value={password} onChange={setPassword} placeholder="••••••••" secure />
+
+            <AppButton title="Registrar" onPress={handleRegister} />
+
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
+              <Text style={styles.link}>Voltar ao login</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+/* -------------------- DASHBOARD -------------------- */
+function DashboardScreen({ navigation }) {
+  const { user, signOut } = useContext(AuthContext);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const sampleData = [
+    { id: '1', soilMoisture: '32%', airTemp: '28°C', airHumidity: '60%', cultureCoef: '0.85', sapFlow: '2.4 L/h', timestamp: '2025-10-30 14:15' },
+    { id: '2', soilMoisture: '40%', airTemp: '26°C', airHumidity: '58%', cultureCoef: '0.90', sapFlow: '1.9 L/h', timestamp: '2025-10-30 15:00' }
+  ];
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header title="Dados da Irrigação" onMenuPress={() => setMenuVisible(true)} />
+
+      <SideMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onProfile={() => navigation.navigate('Profile')}
+        onSignOut={() => { signOut(); navigation.replace('Login'); }}
       />
-      /* Botão Registrar area */
-      <TouchableOpacity style={styles.regabutton} onPress={() => navigation.navigate("Area")}>
-        <Text style={styles.buttonText}>Gerenciar Area e Cultura</Text>
-      </TouchableOpacity>
-    </View>
+
+      <View style={styles.content}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Últimas Leituras</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Area')}>
+            <Text style={styles.linkSmall}>Gerenciar áreas</Text>
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={sampleData}
+          keyExtractor={(i) => i.id}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitleSmall}>Sensor {item.id}</Text>
+                <Text style={styles.cardTime}>{item.timestamp}</Text>
+              </View>
+
+              <View style={styles.cardBody}>
+                <Text style={styles.cardText}>Umidade do Solo: <Text style={styles.badge}>{item.soilMoisture}</Text></Text>
+                <Text style={styles.cardText}>Temperatura do Ar: {item.airTemp}</Text>
+                <Text style={styles.cardText}>Umidade Relativa: {item.airHumidity}</Text>
+                <Text style={styles.cardText}>Coef. Cultural: {item.cultureCoef}</Text>
+                <Text style={styles.cardText}>Fluxo de Seiva: {item.sapFlow}</Text>
+              </View>
+            </View>
+          )}
+        />
+
+        <AppButton
+          title="Gerenciar Área e Cultura"
+          onPress={() => navigation.navigate('Area')}
+          style={{ marginTop: 6 }}
+          icon={<Ionicons name="layers" size={18} color="#fff" />}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
+
+/* -------------------- PROFILE -------------------- */
+function ProfileScreen() {
+  const { user, updateProfile } = useContext(AuthContext);
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+
+  const save = () => {
+    updateProfile({ name, email });
+    Alert.alert('Sucesso', 'Perfil atualizado');
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.sectionTitle}>Perfil</Text>
+
+        <View style={styles.cardSmall}>
+          <Field label="Nome" value={name} onChange={setName} />
+          <Field label="Email" value={email} onChange={setEmail} />
+          <AppButton title="Salvar" onPress={save} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+/* -------------------- AREA + CULTURE SCREEN (AQUI ESTAVA O PROBLEMA) -------------------- */
 function AreaScreen({ navigation }) {
-  /* Area */
-  const [name, setName] = useState("");
-  const [localizacao, setLocalizacao] = useState("");
-  const [tamanho, setTamanho] = useState("");
-  const [solo, setSolo] = useState("");
-  const [campo, setCampo] = useState("");
-  const [murcha, setMurcha] = useState("");
+  const [name, setName] = useState('');
+  const [local, setLocal] = useState('');
+  const [size, setSize] = useState('');
+  const [soil, setSoil] = useState('');
+  const [wiltPoint, setWiltPoint] = useState('');
 
-  /* Cultura */
-  const [namec, setNameC] = useState("");
-  const [data, setData] = useState("");
-  const [profund, setProfund] = useState("");
-  return (
-    <ScrollView style={styles.containerScroll}>
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Area</Text>
-      <Text style={styles.title2}>Areas Cadastradas</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Localização" value={localizacao} onChangeText={setLocalizacao} />
-      <TextInput style={styles.input} placeholder="Tamanho" value={tamanho} onChangeText={setTamanho} />
-      <TextInput style={styles.input} placeholder="Tipo de Solo" value={solo} onChangeText={setSolo} />
-      <TextInput style={styles.input} placeholder="Ponto de Murcha Permanente" value={murcha} onChangeText={setMurcha} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("EditArea")}>
-        <Text style={styles.buttonText}>Editar Area</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("RegisterArea")}>
-        <Text style={styles.buttonText}>Cadastrar Area</Text>
-      </TouchableOpacity>
-      <Text style={styles.title2}>Culturas Cadastradas</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={namec} onChangeText={setNameC} />
-      <TextInput style={styles.input} placeholder="Data de Plantio" value={data} onChangeText={setData} />
-      <TextInput style={styles.input} placeholder="Profundidade Efetiva Raiz" value={profund} onChangeText={setProfund} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("EditCultura")}>
-        <Text style={styles.buttonText}>Editar Cultura</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("RegisterCultura")}>
-        <Text style={styles.buttonText}>Cadastrar Cultura</Text>
-      </TouchableOpacity>
-    </View>
-    </ScrollView>
-  );
-}
+  const [cropName, setCropName] = useState('');
+  const [plantDate, setPlantDate] = useState('');
+  const [rootDepth, setRootDepth] = useState('');
 
-/* Registrar Area */
-function RegisterAreaScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [localizacao, setLocalizacao] = useState("");
-  const [tamanho, setTamanho] = useState("");
-  const [solo, setSolo] = useState("");
-  const [campo, setCampo] = useState("");
-  const [murcha, setMurcha] = useState("");
+  const saveArea = () => Alert.alert('Salvo', `Área "${name}" salva`);
+  const saveCrop = () => Alert.alert('Salvo', `Cultura "${cropName}" salva`);
+
   return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Cadastro de Area</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Localização" value={localizacao} onChangeText={setLocalizacao} />
-      <TextInput style={styles.input} placeholder="Tamanho" value={tamanho} onChangeText={setTamanho} />
-      <TextInput style={styles.input} placeholder="Tipo de Solo" value={solo} onChangeText={setSolo} />
-      <TextInput style={styles.input} placeholder="Ponto de Murcha Permanente" value={murcha} onChangeText={setMurcha} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Login")}>
-        <Text style={styles.buttonText}>Registrar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-/* Editar Area */
-function EditAreaScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [localizacao, setLocalizacao] = useState("");
-  const [tamanho, setTamanho] = useState("");
-  const [solo, setSolo] = useState("");
-  const [campo, setCampo] = useState("");
-  const [murcha, setMurcha] = useState("");
-  return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Editar Area</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Localização" value={localizacao} onChangeText={setLocalizacao} />
-      <TextInput style={styles.input} placeholder="Tamanho" value={tamanho} onChangeText={setTamanho} />
-      <TextInput style={styles.input} placeholder="Tipo de Solo" value={solo} onChangeText={setSolo} />
-      <TextInput style={styles.input} placeholder="Ponto de Murcha Permanente" value={murcha} onChangeText={setMurcha} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Login")}>
-        <Text style={styles.buttonText}>Registrar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-/* Registrar Cultura */
-function RegisterCulturaScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [data, setData] = useState("");
-  const [profund, setProfund] = useState("");
-  return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Cadastrar Cultura</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Data de Plantio" value={data} onChangeText={setData} />
-      <TextInput style={styles.input} placeholder="Profundidade Efetiva Raiz" value={profund} onChangeText={setProfund} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Login")}>
-        <Text style={styles.buttonText}>Registrar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-/* Editar Cultura */
-function EditCulturaScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [data, setData] = useState("");
-  const [profund, setProfund] = useState("");
-  return (
-    <View style={styles.containerCenter}>
-      <Text style={styles.title}>Editar Cultura</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Data de Plantio" value={data} onChangeText={setData} />
-      <TextInput style={styles.input} placeholder="Profundidade Efetiva Raiz" value={profund} onChangeText={setProfund} />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Login")}>
-        <Text style={styles.buttonText}>Registrar</Text>
-      </TouchableOpacity>
-    </View>
+    <SafeAreaView style={styles.container}>
+      <Header title="Áreas & Culturas" onMenuPress={() => navigation.navigate('Profile')} />
+
+      {/* AQUI ESTÁ O FIX DO TECLADO */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+
+          <Text style={styles.sectionTitle}>Cadastrar / Editar Área</Text>
+
+          <View style={styles.cardSmall}>
+            <Field label="Nome da Área" value={name} onChange={setName} placeholder="Talhão A" />
+            <Field label="Localização" value={local} onChange={setLocal} placeholder="Cidade - Estado" />
+            <Field label="Tamanho" value={size} onChange={setSize} placeholder="hectares" />
+            <Field label="Tipo de Solo" value={soil} onChange={setSoil} placeholder="Argiloso / Arenoso" />
+            <Field label="Ponto de Murcha" value={wiltPoint} onChange={setWiltPoint} placeholder="valor" />
+            <AppButton title="Salvar Área" onPress={saveArea} />
+          </View>
+
+          <Text style={styles.sectionTitle}>Cadastrar / Editar Cultura</Text>
+
+          <View style={styles.cardSmall}>
+            <Field label="Nome da Cultura" value={cropName} onChange={setCropName} placeholder="Milho" />
+            <Field label="Data de Plantio" value={plantDate} onChange={setPlantDate} placeholder="AAAA-MM-DD" />
+            <Field label="Profundidade da Raiz" value={rootDepth} onChange={setRootDepth} placeholder="cm" />
+            <AppButton title="Salvar Cultura" onPress={saveCrop} />
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-
+/* -------------------- APP ROOT -------------------- */
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Area" component={AreaScreen} />
-        <Stack.Screen name="RegisterArea" component={RegisterAreaScreen} />
-        <Stack.Screen name="EditArea" component={EditAreaScreen} />
-        <Stack.Screen name="RegisterCultura" component={RegisterCulturaScreen} />
-        <Stack.Screen name="EditCultura" component={EditCulturaScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Area" component={AreaScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
 
+/* -------------------- Styles -------------------- */
+const colors = {
+  primary: '#2b6e35',
+  primaryDark: '#23592c',
+  background: '#eef7ee',
+  card: '#ffffff',
+  text: '#213522',
+  muted: '#6b776b',
+};
+
+const ui = StyleSheet.create({
+  fieldWrap: { width: '100%', marginBottom: 12 },
+  fieldLabel: { color: colors.text, fontSize: 13, marginBottom: 6, fontWeight: '600' },
+  input: {
+    width: '100%',
+    height: 48,
+    backgroundColor: '#fbfdfb',
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e6efe6',
+    color: colors.text
+  },
+
+  button: {
+    width: '100%',
+    height: 50,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    marginTop: 8
+  },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  btnIcon: { marginRight: 10 },
+
+  header: {
+    height: 72,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14
+  },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  headerIcon: { padding: 6 },
+
+  menuContainer: { position: 'absolute', top: 90, width: 200, zIndex: 999 },
+  menuCard: { backgroundColor: '#fff', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 6, elevation: 6 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10, gap: 10 },
+  menuText: { fontSize: 16, color: colors.text, fontWeight: '600' },
+});
+
 const styles = StyleSheet.create({
-  containerCenter: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20, backgroundColor: "#eef7ee"},
-  containerScroll: {marginTop: 30, marginBottom: 45},
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 25, color: "#2b6e35" },
-  title2: { fontSize: 20, fontWeight: "bold", marginBottom: 25, color: "#2b6e35" },
-  titleDashboard: { fontSize: 28, fontWeight: "bold", marginTop: 35, marginBottom: 20, color: "#2b6e35" },
-  input: { width: "100%", height: 50, backgroundColor: "#fff", marginBottom: 12, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: "#88b090" },
-  button: { width: "100%", height: 50, backgroundColor: "#2b6e35", justifyContent: "center", alignItems: "center", borderRadius: 10, marginTop: 10 },
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  linkText: { color: "#1a73e8", marginTop: 15, fontWeight: "bold" },
-  infoCard: { width: "95%", backgroundColor: "#fff", padding: 30, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: "#c8dbc8", elevation: 6, zIndex: 1 },
-  profileIconRight: { position: "absolute", top: 55, right: 20, zIndex: 20 },
-  sideMenuRight: { position: "absolute", top: 105, width: 180, backgroundColor: "white", borderLeftWidth: 2, borderColor: "#4c8c4a", paddingVertical: 10, elevation: 10 },
-  menuItem: { padding: 12, borderBottomWidth: 1, borderColor: "#c8dbc8" },
-  menuText: { fontSize: 18, fontWeight: "600", color: "#2b6e35" },
-  menuButton: { backgroundColor: "#4c8c4a", padding: 10, borderRadius: 8, marginTop: 15 },
-  regabutton: { width: "100%", height: 50, backgroundColor: "#2b6e35", justifyContent: "center", alignItems: "center", borderRadius: 10, bottom: 50 }
+  container: { flex: 1, backgroundColor: colors.background },
+  centerColumn: { flexGrow: 1, padding: 20, alignItems: 'center', justifyContent: 'center' },
+
+  brandBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    width: '100%',
+    backgroundColor: colors.primaryDark,
+    borderRadius: 12,
+    marginBottom: 18
+  },
+  brandTitle: { color: '#fff', fontSize: 28, fontWeight: '800' },
+  brandSubtitle: { color: '#e6f3e6', fontSize: 14, marginTop: 4 },
+
+  cardSmall: {
+    width: '100%',
+    backgroundColor: colors.card,
+    padding: 18,
+    borderRadius: 12,
+    elevation: 6,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: colors.card,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 4
+  },
+
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  cardTitleSmall: { fontSize: 16, fontWeight: '700', color: colors.text },
+  cardTime: { fontSize: 12, color: colors.muted },
+
+  cardBody: { marginTop: 6 },
+  cardText: { color: colors.text, fontSize: 14, marginBottom: 6 },
+  badge: { fontWeight: '800', color: colors.primary },
+
+  content: { padding: 16, flexGrow: 1 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginVertical: 12 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  link: { textAlign: 'center', color: colors.primary, fontWeight: '700' },
+  linkSmall: { color: colors.primary, fontWeight: '700' },
 });
