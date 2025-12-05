@@ -8,16 +8,16 @@ export function checkHydricStress(Dr, DZtop, TAW, psto) {
   const { upper, lower } = calcStomatalThresholds(TAW, psto);
   const Ks = calcKsSto(D, upper, lower);
 
-  let status = "No Stress";
+  let status = "Sem Stress";
   let recommendedAction = "Nenhuma ação necessária.";
 
   if (Ks < 1 && Ks > 0.3) {
-    status = "Moderate Stress";
+    status = "Stress Moderado";
     recommendedAction = "Considere irrigar nas próximas horas.";
   }
 
   if (Ks <= 0.3) {
-    status = "Severe Stress";
+    status = "Stress Severo";
     recommendedAction = "⚠️ Irrigação URGENTE!";
   }
 

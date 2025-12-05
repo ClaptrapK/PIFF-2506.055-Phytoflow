@@ -256,21 +256,6 @@ function DashboardScreen({ navigation }) {
         onSignOut={() => { signOut(); navigation.replace('Login'); }}
       />
         <ScrollView style={styles.container}>
-        <TouchableOpacity
-            onPress={() =>
-              navigation.navigate("Analytics", {
-                sensorData: sampleData,
-                soilParams: {
-                  thetaFC: 0.30,
-                  thetaWP: 0.10,
-                  rootDepth: 0.4,
-                  psto: 0.55
-                }
-              })
-            }
-          >
-          <Text style={styles.linkSmall}>Abrir Análises</Text>
-          </TouchableOpacity>
 
         <View style={styles.content}>
           <View style={styles.rowBetween}>
