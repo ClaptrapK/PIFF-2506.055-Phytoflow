@@ -23,9 +23,9 @@ import {
   calcTAW,
   calcRootZoneDepletion,
   calcTopSoilDepletion
-} from "irrigationCalc";
+} from "./irrigationCalc";
 
-import { checkHydricStress } from "stressMonitor";
+import { checkHydricStress } from "./stressMonitor";
 
 import { LineChart, BarChart } from "react-native-chart-kit";
 import {
@@ -33,16 +33,21 @@ import {
   buildLineChartConfig,
   chartWidth,
   chartHeight
-} from "chartBuilder";
+} from "./chartBuilder";
+
+import AnalyticsScreen from './AnalyticsScreen';
+import IrrigationParamsScreen from './IrrigationParamsScreen';
 
 const Stack = createNativeStackNavigator();
 const statusBarHeight = StatusBar.currentHeight;
 
-<Stack.Screen name="Analytics" component={AnalyticsScreen} />
+
+
 /*<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
   <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark}/>
   {/* Outros componentes }
   </View>*/
+
 /* -------------------- Verifica Login -------------------- */
 const AuthContext = createContext();
 function AuthProvider({ children }) {
@@ -213,6 +218,32 @@ function DashboardScreen({ navigation }) {
     { id: '4', soilMoisture: '40%', airTemp: '27°C', airHumidity: '50%', cultureCoef: '0.70', sapFlow: '2.2 L/h', timestamp: '2025-11-13 15:30' }
   ];
 
+  /* Vericar Stress Hídrico */
+
+  const handleCheckStress = () => {
+    const thetaFC = 0.30;
+    const thetaWP = 0.10;
+    const rootDepth = 0.40; // meters
+    const gravel = 0;
+    const psto = 0.55; // crop parameter
+
+    const thetaCurrent = 0.22;
+    const thetaTop = 0.18;
+    const thetaTopFC = 0.28;
+    const depthTop = 0.15;
+
+    const TAW = calcTAW(thetaFC, thetaWP, rootDepth, gravel);
+    const Dr = calcRootZoneDepletion(thetaCurrent, thetaFC, rootDepth, gravel);
+    const DZtop = calcTopSoilDepletion(thetaTop, thetaTopFC, depthTop, gravel);
+
+    const result = checkHydricStress(Dr, DZtop, TAW, psto);
+
+    Alert.alert(
+      "Status Hídrico da Planta",
+      `${result.status}\n\n${result.recommendedAction}`
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark}/>
@@ -224,38 +255,65 @@ function DashboardScreen({ navigation }) {
         onProfile={() => navigation.navigate('Profile')}
         onSignOut={() => { signOut(); navigation.replace('Login'); }}
       />
-
-      <View style={styles.content}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Últimas Leituras</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Area')}>
-            <Text style={styles.linkSmall}>Gerenciar áreas</Text>
+        <ScrollView style={styles.container}>
+        <TouchableOpacity
+            onPress={() =>
+              navigation.navigate("Analytics", {
+                sensorData: sampleData,
+                soilParams: {
+                  thetaFC: 0.30,
+                  thetaWP: 0.10,
+                  rootDepth: 0.4,
+                  psto: 0.55
+                }
+              })
+            }
+          >
+          <Text style={styles.linkSmall}>Abrir Análises</Text>
           </TouchableOpacity>
-        </View>
 
-        <FlatList
-          data={sampleData}
-          keyExtractor={(i) => i.id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitleSmall}>Leitura {item.id}</Text>
-                <Text style={styles.cardTime}>{item.timestamp}</Text>
-              </View>
+        <View style={styles.content}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.sectionTitle}>Últimas Leituras</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Area')}>
+              <Text style={styles.linkSmall}>Gerenciar áreas</Text>
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.cardBody}>
-                <Text style={styles.cardText}>Umidade do Solo: <Text style={styles.badge}>{item.soilMoisture}</Text></Text>
-                <Text style={styles.cardText}>Temperatura do Ar: {item.airTemp}</Text>
-                <Text style={styles.cardText}>Umidade Relativa: {item.airHumidity}</Text>
-                <Text style={styles.cardText}>Coef. Cultural: {item.cultureCoef}</Text>
-                <Text style={styles.cardText}>Fluxo de Seiva: {item.sapFlow}</Text>
+          <FlatList
+            data={sampleData}
+            keyExtractor={(i) => i.id}
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitleSmall}>Leitura {item.id}</Text>
+                  <Text style={styles.cardTime}>{item.timestamp}</Text>
+                </View>
+
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardText}>Umidade do Solo: <Text style={styles.badge}>{item.soilMoisture}</Text></Text>
+                  <Text style={styles.cardText}>Temperatura do Ar: {item.airTemp}</Text>
+                  <Text style={styles.cardText}>Umidade Relativa: {item.airHumidity}</Text>
+                  <Text style={styles.cardText}>Coef. Cultural: {item.cultureCoef}</Text>
+                  <Text style={styles.cardText}>Fluxo de Seiva: {item.sapFlow}</Text>
+                </View>
               </View>
-            </View>
-          )}
-        />
-        /*<TouchableOpacity
-          onPress={() =>
-            navigation.navigate("Analytics", {
+            )}
+          />
+
+          <AppButton
+            title="Configurar Parâmetros"
+            onPress={() => navigation.navigate("IrrigationParams")}
+            icon={<Ionicons name="settings" size={18} color="#fff" />}
+          />
+          <AppButton
+              title="Verificar Estresse Hídrico"
+              onPress={handleCheckStress}
+              icon={<Ionicons name="water" size={18} color="#fff" />}
+            />
+          <AppButton
+            title="Gráficos"
+            onPress={() => navigation.navigate("Analytics", {
               sensorData: sampleData,
               soilParams: {
                 thetaFC: 0.30,
@@ -263,18 +321,18 @@ function DashboardScreen({ navigation }) {
                 rootDepth: 0.4,
                 psto: 0.55
               }
-            })
-          }
-        >*/
-  <Text style={styles.linkSmall}>Abrir Análises</Text>
-</TouchableOpacity>
-        <AppButton
-          title="Gerenciar Área e Cultura"
-          onPress={() => navigation.navigate('Area')}
-          style={{ marginTop: 6 }}
-          icon={<Ionicons name="layers" size={18} color="#fff" />}
-        />
-      </View>
+            })}
+            style={{ marginTop: 6 }}
+            icon={<Ionicons name="layers" size={18} color="#fff" />}
+          />
+          <AppButton
+            title="Gerenciar Área e Cultura"
+            onPress={() => navigation.navigate('Area')}
+            style={{ marginTop: 6 }}
+            icon={<Ionicons name="layers" size={18} color="#fff" />}
+          />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -326,7 +384,6 @@ function AreaScreen({ navigation }) {
 
       <Header title="Áreas & Culturas" onMenuPress={() => navigation.navigate('Profile')} />
 
-      {/* AQUI ESTÁ O FIX DO TECLADO */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
@@ -367,6 +424,8 @@ export default function App() {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="Area" component={AreaScreen} />
+          <Stack.Screen name="IrrigationParams" component={IrrigationParamsScreen} />
+          <Stack.Screen name="Analytics" component={AnalyticsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </AuthProvider>

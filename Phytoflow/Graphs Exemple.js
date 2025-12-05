@@ -61,3 +61,6 @@
   chartConfig={buildLineChartConfig()}
   style={{ marginTop: 20, borderRadius: 12 }}
 />
+
+/*single function */
+export function generateIrrigationGraphs(sensorData)
