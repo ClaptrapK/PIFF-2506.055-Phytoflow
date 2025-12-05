@@ -12,15 +12,38 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  StatusBar
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const Stack = createNativeStackNavigator();
+import {
+  calcTAW,
+  calcRootZoneDepletion,
+  calcTopSoilDepletion
+} from "irrigationCalc";
 
-/* -------------------- Auth Context -------------------- */
+import { checkHydricStress } from "stressMonitor";
+
+import { LineChart, BarChart } from "react-native-chart-kit";
+import {
+  buildLineChartData,
+  buildLineChartConfig,
+  chartWidth,
+  chartHeight
+} from "chartBuilder";
+
+const Stack = createNativeStackNavigator();
+const statusBarHeight = StatusBar.currentHeight;
+
+<Stack.Screen name="Analytics" component={AnalyticsScreen} />
+/*<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+  <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark}/>
+  {/* Outros componentes }
+  </View>*/
+/* -------------------- Verifica Login -------------------- */
 const AuthContext = createContext();
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -34,7 +57,7 @@ function AuthProvider({ children }) {
   );
 }
 
-/* -------------------- Reusable Components -------------------- */
+/* -------------------- Reutilizavel -------------------- */
 function Field({ label, value, onChange, placeholder, secure = false }) {
   return (
     <View style={ui.fieldWrap}>
@@ -185,11 +208,14 @@ function DashboardScreen({ navigation }) {
 
   const sampleData = [
     { id: '1', soilMoisture: '32%', airTemp: '28°C', airHumidity: '60%', cultureCoef: '0.85', sapFlow: '2.4 L/h', timestamp: '2025-10-30 14:15' },
-    { id: '2', soilMoisture: '40%', airTemp: '26°C', airHumidity: '58%', cultureCoef: '0.90', sapFlow: '1.9 L/h', timestamp: '2025-10-30 15:00' }
+    { id: '2', soilMoisture: '40%', airTemp: '26°C', airHumidity: '58%', cultureCoef: '0.90', sapFlow: '1.9 L/h', timestamp: '2025-10-30 15:00' },
+    { id: '3', soilMoisture: '45%', airTemp: '22°C', airHumidity: '50%', cultureCoef: '0.75', sapFlow: '2.0 L/h', timestamp: '2025-11-06 16:00' },
+    { id: '4', soilMoisture: '40%', airTemp: '27°C', airHumidity: '50%', cultureCoef: '0.70', sapFlow: '2.2 L/h', timestamp: '2025-11-13 15:30' }
   ];
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark}/>
       <Header title="Dados da Irrigação" onMenuPress={() => setMenuVisible(true)} />
 
       <SideMenu
@@ -213,7 +239,7 @@ function DashboardScreen({ navigation }) {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitleSmall}>Sensor {item.id}</Text>
+                <Text style={styles.cardTitleSmall}>Leitura {item.id}</Text>
                 <Text style={styles.cardTime}>{item.timestamp}</Text>
               </View>
 
@@ -227,7 +253,21 @@ function DashboardScreen({ navigation }) {
             </View>
           )}
         />
-
+        /*<TouchableOpacity
+          onPress={() =>
+            navigation.navigate("Analytics", {
+              sensorData: sampleData,
+              soilParams: {
+                thetaFC: 0.30,
+                thetaWP: 0.10,
+                rootDepth: 0.4,
+                psto: 0.55
+              }
+            })
+          }
+        >*/
+  <Text style={styles.linkSmall}>Abrir Análises</Text>
+</TouchableOpacity>
         <AppButton
           title="Gerenciar Área e Cultura"
           onPress={() => navigation.navigate('Area')}
@@ -265,7 +305,7 @@ function ProfileScreen() {
   );
 }
 
-/* -------------------- AREA + CULTURE SCREEN (AQUI ESTAVA O PROBLEMA) -------------------- */
+/* -------------------- AREA + CULTURE SCREEN -------------------- */
 function AreaScreen({ navigation }) {
   const [name, setName] = useState('');
   const [local, setLocal] = useState('');
@@ -282,6 +322,8 @@ function AreaScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+    <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark}/>
+
       <Header title="Áreas & Culturas" onMenuPress={() => navigation.navigate('Profile')} />
 
       {/* AQUI ESTÁ O FIX DO TECLADO */}
@@ -389,7 +431,7 @@ const ui = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background, marginTop: statusBarHeight },
   centerColumn: { flexGrow: 1, padding: 20, alignItems: 'center', justifyContent: 'center' },
 
   brandBox: {
@@ -429,7 +471,7 @@ const styles = StyleSheet.create({
   badge: { fontWeight: '800', color: colors.primary },
 
   content: { padding: 16, flexGrow: 1 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginVertical: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginVertical: 12, marginTop: 20},
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   link: { textAlign: 'center', color: colors.primary, fontWeight: '700' },
