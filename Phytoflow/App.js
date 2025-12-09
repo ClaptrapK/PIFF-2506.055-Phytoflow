@@ -133,6 +133,65 @@ function SideMenu({ visible, onClose, onProfile, onSignOut }) {
   );
 }
 
+/*function SideMenu({ visible, onClose, onProfile, onSignOut }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(anim, {
+      toValue: visible ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [visible]);
+
+  const right = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-220, 10]
+  });
+
+  if (!visible) return null;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+
+      // Ovberlay
+      <TouchableOpacity
+        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.1)" }]}
+        activeOpacity={1}
+        onPress={onClose}
+      />
+
+      // MENU
+      <Animated.View
+        style={[
+          ui.menuContainer,
+          { right, zIndex: 9999, elevation: 20 }   // <--- IMPORTANT
+        ]}
+      >
+        <View style={ui.menuCard}>
+          <TouchableOpacity
+            style={ui.menuItem}
+            onPress={() => { onProfile(); onClose(); }}
+          >
+            <Ionicons name="person" size={20} color="#2b6e35" />
+            <Text style={ui.menuText}>Perfil</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={ui.menuItem}
+            onPress={() => { onSignOut(); onClose(); }}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#2b6e35" />
+            <Text style={ui.menuText}>Sair</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+    </View>
+  );
+}*/
+
 /* -------------------- LOGIN SCREEN -------------------- */
 function LoginScreen({ navigation }) {
   const { signIn } = useContext(AuthContext);
@@ -242,12 +301,17 @@ function DashboardScreen({ navigation }) {
       "Status Hídrico da Planta",
       `${result.status}\n\n${result.recommendedAction}`
     );
+
+    alert(`Status Hídrico da Planta\n${result.status}\n${result.recommendedAction}`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark}/>
-      <Header title="Dados da Irrigação" onMenuPress={() => setMenuVisible(true)} />
+      <Header
+        title="Dados da Irrigação"
+        onMenuPress={() => setMenuVisible(prev => !prev)}
+      />
 
       <SideMenu
         visible={menuVisible}
