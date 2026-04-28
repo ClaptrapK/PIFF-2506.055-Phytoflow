@@ -1,4 +1,4 @@
-import React, { useState, useRef, useContext, createContext } from 'react';
+import React, { useState, useRef, useContext, useEffect, createContext } from 'react';
 import {
   SafeAreaView,
   View,
@@ -19,6 +19,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { getSensorData } from "./dataService";
 import {
   calcTAW,
   calcRootZoneDepletion,
@@ -276,6 +277,46 @@ function DashboardScreen({ navigation }) {
     { id: '3', soilMoisture: '45%', airTemp: '22°C', airHumidity: '50%', cultureCoef: '0.75', sapFlow: '2.0 L/h', timestamp: '2025-11-06 16:00' },
     { id: '4', soilMoisture: '40%', airTemp: '27°C', airHumidity: '50%', cultureCoef: '0.70', sapFlow: '2.2 L/h', timestamp: '2025-11-13 15:30' }
   ];
+  // Carregar dados
+  const [data, setData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const ITEMS_PER_PAGE = 10;
+
+  const loadData = async () => {
+    try {
+      const result = await getSensorData();
+
+      // 🔥 Mais recentes primeiro
+      const reversed = [...result].reverse();
+
+      setData(reversed);
+      setCurrentPage(0); // resetar página
+    } catch (err) {
+      console.log("Erro ao carregar dados:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Atualizar dados
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Paginação
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+
+  const paginatedData = data.slice(
+    currentPage * ITEMS_PER_PAGE,
+    (currentPage + 1) * ITEMS_PER_PAGE
+  );
 
   /* Vericar Stress Hídrico */
 
@@ -324,14 +365,22 @@ function DashboardScreen({ navigation }) {
         <View style={styles.content}>
           <View style={styles.rowBetween}>
             <Text style={styles.sectionTitle}>Últimas Leituras</Text>
+
             <TouchableOpacity onPress={() => navigation.navigate('Area')}>
               <Text style={styles.linkSmall}>Gerenciar áreas</Text>
             </TouchableOpacity>
           </View>
-
+          <AppButton
+          title="Atualizar Dados"
+          onPress={loadData}
+          icon={<Ionicons name="refresh" size={18} color="#fff" />}
+          />
           <FlatList
-            data={sampleData}
+            /*/data={sampleData}*/
+            data={paginatedData}
             keyExtractor={(i) => i.id}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             renderItem={({ item }) => (
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -341,14 +390,52 @@ function DashboardScreen({ navigation }) {
 
                 <View style={styles.cardBody}>
                   <Text style={styles.cardText}>Umidade do Solo: <Text style={styles.badge}>{item.soilMoisture}</Text></Text>
+                  <Text style={styles.cardText}>Temperatura: {item.temp}</Text>
+                  <Text style={styles.cardText}>Temperatura da folha: {item.leafTemp}</Text>
+                  <Text style={styles.cardText}>Pressão: {item.pressure}</Text>
                   <Text style={styles.cardText}>Temperatura do Ar: {item.airTemp}</Text>
-                  <Text style={styles.cardText}>Umidade Relativa: {item.airHumidity}</Text>
+                  <Text style={styles.cardText}>Umidade do Ar: {item.airHumidity}</Text>
                   <Text style={styles.cardText}>Coef. Cultural: {item.cultureCoef}</Text>
                   <Text style={styles.cardText}>Fluxo de Seiva: {item.sapFlow}</Text>
                 </View>
               </View>
             )}
           />
+          {/* PAGINAÇÃO */}
+       <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }}>
+
+         <TouchableOpacity
+           onPress={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+           disabled={currentPage === 0}
+           style={[
+             ui.button,
+             { flex: 1, marginRight: 5, opacity: currentPage === 0 ? 0.5 : 1 }
+           ]}
+         >
+           <Text style={ui.buttonText}>Anterior</Text>
+         </TouchableOpacity>
+
+         <TouchableOpacity
+           onPress={() =>
+             setCurrentPage((prev) =>
+               Math.min(prev + 1, totalPages - 1)
+             )
+           }
+           disabled={currentPage >= totalPages - 1}
+           style={[
+             ui.button,
+             { flex: 1, marginLeft: 5, opacity: currentPage >= totalPages - 1 ? 0.5 : 1 }
+           ]}
+         >
+           <Text style={ui.buttonText}>Próximo</Text>
+         </TouchableOpacity>
+       </View>
+
+       {/*INDICADOR */}
+       <Text style={{ textAlign: "center", marginTop: 5 }}>
+         Página {currentPage + 1} de {totalPages || 1}
+       </Text>
+
 
           <AppButton
             title="Configurar Parâmetros"
@@ -363,7 +450,7 @@ function DashboardScreen({ navigation }) {
           <AppButton
             title="Gráficos"
             onPress={() => navigation.navigate("Analytics", {
-              sensorData: sampleData,
+              sensorData: paginatedData,
               soilParams: {
                 thetaFC: 0.30,
                 thetaWP: 0.10,
