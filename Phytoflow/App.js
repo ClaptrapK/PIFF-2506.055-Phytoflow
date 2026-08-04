@@ -287,10 +287,23 @@ function DashboardScreen({ navigation }) {
     try {
       const result = await getSensorData();
 
-      // 🔥 Mais recentes primeiro
-      const reversed = [...result].reverse();
+      // Mais recentes primeiro
+      const sorted = [...result].sort(
+        (a, b) => {
+          const da = new Date(
+            a.rawTimestamp || a.timestamp
+          );
 
-      setData(reversed);
+          const db = new Date(
+            b.rawTimestamp || b.timestamp
+          );
+
+          return db - da;
+        }
+      );
+
+      setData(sorted);
+      
       setCurrentPage(0); // resetar página
     } catch (err) {
       console.log("Erro ao carregar dados:", err);
@@ -390,13 +403,12 @@ function DashboardScreen({ navigation }) {
 
                 <View style={styles.cardBody}>
                   <Text style={styles.cardText}>Umidade do Solo: <Text style={styles.badge}>{item.soilMoisture}</Text></Text>
-                  <Text style={styles.cardText}>Temperatura: {item.temp}</Text>
                   <Text style={styles.cardText}>Temperatura da folha: {item.leafTemp}</Text>
                   <Text style={styles.cardText}>Pressão: {item.pressure}</Text>
                   <Text style={styles.cardText}>Temperatura do Ar: {item.airTemp}</Text>
                   <Text style={styles.cardText}>Umidade do Ar: {item.airHumidity}</Text>
-                  <Text style={styles.cardText}>Coef. Cultural: {item.cultureCoef}</Text>
                   <Text style={styles.cardText}>Fluxo de Seiva: {item.sapFlow}</Text>
+                  <Text style={styles.cardText}>Ks (Estresse): {item.Ks}</Text>
                 </View>
               </View>
             )}
@@ -447,10 +459,10 @@ function DashboardScreen({ navigation }) {
               onPress={handleCheckStress}
               icon={<Ionicons name="water" size={18} color="#fff" />}
             />
-          <AppButton
+            <AppButton
             title="Gráficos"
             onPress={() => navigation.navigate("Analytics", {
-              sensorData: paginatedData,
+              sensorData: data,
               soilParams: {
                 thetaFC: 0.30,
                 thetaWP: 0.10,

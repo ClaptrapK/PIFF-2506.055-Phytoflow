@@ -1,93 +1,255 @@
+// dataService.js
+
 import { fetchSheetData } from "./GetSheetData";
 
+// =======================================
+// Formata data para DD/MM/YYYY HH:mm
+// =======================================
+
 function formatDate(rawDate) {
+
   if (!rawDate) return "";
 
-  const match = rawDate.match(/\d+/g);
-  if (!match) return rawDate;
+  if (rawDate instanceof Date) {
 
-  const [year, month, day, hour, min, sec] = match;
+    const d = rawDate;
 
-  return `${day}/${Number(month)+1}/${year} ${hour}:${min}`;
-}
+    return `${String(d.getDate()).padStart(2,"0")}/${
+      String(d.getMonth()+1).padStart(2,"0")
+    }/${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${
+      String(d.getMinutes()).padStart(2,"0")}`;
 
-function normalizePercentage(value) {
-  if (value == null) return 0;
-
-  let num = parseFloat(value);
-
-  // Corrigir valores absurdos
-  if (Math.abs(num) < 1) {
-    num = num * 100;
   }
 
-  // Evitar negativos
-  if (num < 0) num = 0;
+  if (typeof rawDate === "string") {
 
-  return num.toFixed(2);
+    if (rawDate.startsWith("Date(")) {
+
+      const nums =
+        rawDate.match(/\d+/g);
+
+      if (nums) {
+
+        const d =
+          new Date(
+            Number(nums[0]),
+            Number(nums[1]),
+            Number(nums[2]),
+            Number(nums[3]),
+            Number(nums[4]),
+            Number(nums[5])
+          );
+
+        return formatDate(d);
+
+      }
+
+    }
+
+    const d = new Date(rawDate);
+
+    if (!isNaN(d))
+      return formatDate(d);
+
+    return rawDate;
+  }
+
+  return "";
 }
 
-function formatTemperature(value) {
-  if (value == null) return "0°C";
+// =======================================
+// Fluxo de Seiva
+// (temporário até vir da planilha)
+// =======================================
 
-  return `${parseFloat(value).toFixed(2)}°C`;
+function calcSapFlow(
+  amp1,
+  amp2,
+  amp3,
+  amp4
+) {
+
+  const amps = [
+    amp1,
+    amp2,
+    amp3,
+    amp4
+  ].filter(v => v != null);
+
+  if (amps.length === 0)
+    return 0;
+
+  const media =
+    amps.reduce(
+      (a,b)=>a+b,
+      0
+    ) / amps.length;
+
+  return Math.abs(media);
 }
 
-function formatFlow(value) {
-  if (!value || value <= 0) return "Sem fluxo";
+// =======================================
+// MAIN
+// =======================================
 
-  return `${parseFloat(value).toFixed(2)} L/h`;
-}
-
-function formatPressure(value) {
-  if (value == null) return "Não Encontrado";
-
-  return `${parseFloat(value).toFixed(2)}kPa`;
-}
-
-// Processamento extra depois caso necessario
 export async function getSensorData() {
-  const raw = await fetchSheetData();
 
-  return raw.map((item) => {
-    const soil = normalizePercentage(item.soilMoisture);
-    const temp = formatTemperature(item.temp);
-    const airTemp = formatTemperature(item.airTemp);
-    const leafTemp = formatTemperature(item.leafTemp);
-    const pressure = formatPressure(item.pressure);
-    const humidity = normalizePercentage(item.airHumidity);
-    const flow = formatFlow(item.samples_flow);
+  const raw =
+    await fetchSheetData();
 
-    /*timestamp: row.c[0]?.v,
-    temp: (row.c[3]?.v ?? 0) + "°C",
-    pressure: (row.c[4]?.v ?? 0) + "°C",
-    airHumidity: (row.c[5]?.v ?? 0) + "%",
-    airTemp: (row.c[6]?.v ?? 0) + "°C",
-    leafTemp: (row.c[7]?.v ?? 0) + "°C",
-    soilMoisture: (row.c[7]?.v ?? 0) + "%",
-    sapFlow: (row.c[20]?.v ?? 0) + " L/h",*/
+  return raw.map(item => {
+
+    const sapFlow =
+      calcSapFlow(
+        item.ampT1,
+        item.ampT2,
+        item.ampT3,
+        item.ampT4
+      );
 
     return {
+
       id: item.id,
 
-      timestamp: formatDate(item.timestamp),
+      rawTimestamp:
+        item.timestamp,
 
-      soilMoisture: `${soil}%`,
-      temp: temp,
-      pressure: pressure,
-      airTemp: airTemp,
-      leafTemp: leafTemp,
-      airHumidity: `${humidity}%`,
-      sapFlow: flow,
+      timestamp:
+        formatDate(
+          item.timestamp
+        ),
 
-      //valores numéricos (para cálculos)
-      soilMoistureValue: parseFloat(soil),
-      TempValue: parseFloat(temp),
-      pressureValue: parseFloat(pressure),
-      airTempValue: parseFloat(airTemp),
-      leafTempValue: parseFloat(leafTemp),
-      humidityValue: parseFloat(humidity),
-      sapFlowValue: parseFloat(item.samples_flow) || 0,
+      //=========================
+      // Dados Sensor
+      //=========================
+
+      soilMoisture:
+        `${item.soilMoisture?.toFixed(1) ?? "--"}%`,
+
+      airTemp:
+        `${item.airTemp?.toFixed(1) ?? "--"}°C`,
+
+      airHumidity:
+        `${item.airHumidity?.toFixed(1) ?? "--"}%`,
+
+      leafTemp:
+        `${item.leafTemp?.toFixed(1) ?? "--"}°C`,
+
+      pressure:
+        `${item.pressure?.toFixed(1) ?? "--"} hPa`,
+
+      //=========================
+      // Fluxo de Seiva
+      //=========================
+
+      sapFlow:
+        `${sapFlow.toFixed(3)}`,
+
+      //=========================
+      // Dados Calculados
+      //=========================
+
+      dpv:
+        item.dpv,
+
+      ctd:
+        item.ctd,
+
+      deltaSap:
+        item.deltaSap,
+
+      deltaCTD:
+        item.deltaCTD,
+
+      deltaDPV:
+        item.deltaDPV,
+
+      dpvSap:
+        item.dpvSap,
+
+      dpvCanopy:
+        item.dpvCanopy,
+
+      slope:
+        item.slope,
+
+      r2:
+        item.r2,
+
+      siSigma:
+        item.siSigma,
+
+      siHybrid:
+        item.siHybrid,
+
+      canopyInstant:
+        item.canopyInstant,
+
+      canopyDaily:
+        item.canopyDaily,
+
+      //=========================
+      // Valores Numéricos
+      //=========================
+
+      soilMoistureValue:
+        item.soilMoisture,
+
+      airTempValue:
+        item.airTemp,
+
+      humidityValue:
+        item.airHumidity,
+
+      leafTempValue:
+        item.leafTemp,
+
+      pressureValue:
+        item.pressure,
+
+      sapFlowValue:
+        sapFlow,
+
+      dpvValue:
+        item.dpv,
+
+      ctdValue:
+        item.ctd,
+
+      deltaSapValue:
+        item.deltaSap,
+
+      deltaCTDValue:
+        item.deltaCTD,
+
+      deltaDPVValue:
+        item.deltaDPV,
+
+      dpvSapValue:
+        item.dpvSap,
+
+      dpvCanopyValue:
+        item.dpvCanopy,
+
+      slopeValue:
+        item.slope,
+
+      r2Value:
+        item.r2,
+
+      siSigmaValue:
+        item.siSigma,
+
+      siHybridValue:
+        item.siHybrid,
+
+      canopyInstantValue:
+        item.canopyInstant,
+
+      canopyDailyValue:
+        item.canopyDaily
     };
+
   });
+
 }

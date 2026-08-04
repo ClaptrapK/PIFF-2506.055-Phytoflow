@@ -1,97 +1,523 @@
+// analyticsBuilder.js
+
 import {
   buildLineChartData,
-  buildMultiLineChartData,
   buildLineChartConfig
 } from "./chartBuilder";
 
-import {
-  calcTAW,
-  calcRootZoneDepletion,
-  calcTopSoilDepletion
-} from "./irrigationCalc";
+// =====================================
+// Util
+// =====================================
 
-import { checkHydricStress } from "./stressMonitor";
+function number(value) {
 
-// ======================================================================
-//  Single function that generates ALL irrigation charts + Ks curve
-// ======================================================================
-export function generateAnalytics(sensorData, soilParams) {
-  // sensorData = array of objects like:
-  // { timestamp, soilMoisture, airTemp, sapFlow }
+  if (value == null) return 0;
 
-  // soilParams = { thetaFC, thetaWP, rootDepth, porosity, psto }
+  if (typeof value === "number")
+    return value;
 
-  // extract time labels
-  const labels = sensorData.map(i => i.timestamp.slice(11, 16)); // HH:mm
+  return (
+    parseFloat(
+      String(value).replace(",", ".")
+    ) || 0
+  );
 
-  // Soil moisture dataset
-  const soilValues = sensorData.map(i => parseFloat(i.soilMoisture));
+}
 
-  // Temperature dataset
-  const tempValues = sensorData.map(i => parseFloat(i.airTemp));
+// =====================================
+// Status baseado no SI Híbrido
+// =====================================
 
-  // Sap flow dataset
-  const sapValues = sensorData.map(i => parseFloat(i.sapFlow));
+function getStressStatus(si) {
 
-  // =====================================================
-  // Calculate Ks (stress coefficient) for each timestamp
-  // =====================================================
-  const KsValues = sensorData.map(item => {
-    const thetaCurrent = parseFloat(item.soilMoisture) / 100;
+  if (si <= 0.30)
+    return "Sem Stress";
 
-    const TAW = calcTAW(
-      soilParams.thetaFC,
-      soilParams.thetaWP,
-      soilParams.rootDepth
+  if (si <= 0.60)
+    return "Stress Moderado";
+
+  return "Stress Severo";
+
+}
+
+// =====================================
+// Main
+// =====================================
+
+export function generateAnalytics(sensorData) {
+
+  if (!sensorData || sensorData.length === 0) {
+
+    return {
+
+      current: {},
+      status: "Sem dados"
+
+    };
+
+  }
+
+  // ordena cronologicamente
+
+  const data =
+    [...sensorData].sort(
+
+      (a,b)=>
+
+        new Date(a.rawTimestamp) -
+        new Date(b.rawTimestamp)
+
     );
 
-    const Dr = calcRootZoneDepletion(
-      thetaCurrent,
-      soilParams.thetaFC,
-      soilParams.rootDepth
-    );
+  // Labels
 
-    const DZtop = Dr; // assume top soil = same reading (if you want more accuracy I adjust)
+  const labels =
+    data.map(item => {
 
-    const result = checkHydricStress(Dr, DZtop, TAW, soilParams.psto);
+      if (!item.timestamp)
+        return "";
 
-    return result.Ks;
-  });
+      const split =
+        item.timestamp.split(" ");
+
+      return split.length > 1
+        ? split[1].substring(0,5)
+        : item.timestamp;
+
+    });
+
+  // Último registro
+
+  const current =
+    data[data.length-1];
+
+  //====================================
+  // Dashboard
+  //====================================
+
+  const dashboard = {
+
+    airTemp:
+      number(current.airTempValue).toFixed(1),
+
+    soil:
+      number(current.soilMoistureValue).toFixed(1),
+
+    humidity:
+      number(current.humidityValue).toFixed(1),
+
+    dpv:
+      number(current.dpvValue).toFixed(3),
+
+    ctd:
+      number(current.ctdValue).toFixed(3),
+
+    sapFlow:
+      number(current.sapFlowValue).toFixed(3),
+
+    deltaSap:
+      number(current.deltaSapValue).toFixed(3),
+
+    deltaDPV:
+      number(current.deltaDPVValue).toFixed(3),
+
+    deltaCTD:
+      number(current.deltaCTDValue).toFixed(3),
+
+    siSigma:
+      number(current.siSigmaValue).toFixed(3),
+
+    siHybrid:
+      number(current.siHybridValue).toFixed(3),
+
+    r2:
+      number(current.r2Value).toFixed(3)
+
+  };
 
   return {
-    soilChart: {
-      label: "Umidade",
-      data: buildLineChartData(labels, "Umidade (%)", soilValues),
-      config: buildLineChartConfig()
+
+    current: dashboard,
+
+    status:
+      getStressStatus(
+        number(current.siHybridValue)
+      ),
+
+    //----------------------------------
+    // Umidade Solo
+    //----------------------------------
+
+    soilChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Umidade",
+
+        data.map(i=>
+          number(i.soilMoistureValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
     },
 
-    tempChart: {
-      label: "Temperatura",
-      data: buildLineChartData(labels, "Temperatura (°C)", tempValues),
-      config: buildLineChartConfig()
+    //----------------------------------
+    // Umidade Ar
+    //----------------------------------
+
+    humidityChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Umidade",
+
+        data.map(i=>
+          number(i.humidityValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
     },
 
-    sapChart: {
-      label: "Fluxo de Seiva",
-      data: buildLineChartData(labels, "Seiva (L/h)", sapValues),
-      config: buildLineChartConfig()
+    //----------------------------------
+    // Temperatura Ar
+    //----------------------------------
+
+    tempChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Temperatura",
+
+        data.map(i=>
+          number(i.airTempValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
     },
 
-    KsChart: {
-      label: "Ks (Coef. de Estresse)",
-      data: buildLineChartData(labels, "Ks", KsValues),
-      config: buildLineChartConfig()
+    //----------------------------------
+    // Temperatura Folha
+    //----------------------------------
+
+    leafChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Folha",
+
+        data.map(i=>
+          number(i.leafTempValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
     },
 
-    // Multi-line combined chart example
-    combinedChart: {
-      label: "Visão Geral",
-      data: buildMultiLineChartData(labels, {
-        Umidade: soilValues,
-        Temperatura: tempValues,
-        Seiva: sapValues
-      }),
-      config: buildLineChartConfig()
+    //----------------------------------
+    // DPV
+    //----------------------------------
+
+    dpvChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "DPV",
+
+        data.map(i=>
+          number(i.dpvValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // CTD
+    //----------------------------------
+
+    ctdChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "CTD",
+
+        data.map(i=>
+          number(i.ctdValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // Fluxo Seiva
+    //----------------------------------
+
+    sapFlowChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Fluxo",
+
+        data.map(i=>
+          number(i.sapFlowValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // Delta Sap
+    //----------------------------------
+
+    deltaSapChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "ΔSap",
+
+        data.map(i=>
+          number(i.deltaSapValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // Delta CTD
+    //----------------------------------
+
+    deltaCTDChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "ΔCTD",
+
+        data.map(i=>
+          number(i.deltaCTDValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // Delta DPV
+    //----------------------------------
+
+    deltaDPVChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "ΔDPV",
+
+        data.map(i=>
+          number(i.deltaDPVValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // DPV Sap
+    //----------------------------------
+
+    dpvSapChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "DPV Sap",
+
+        data.map(i=>
+          number(i.dpvSapValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // DPV Canopy
+    //----------------------------------
+
+    dpvCanopyChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "DPV Canopy",
+
+        data.map(i=>
+          number(i.dpvCanopyValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // SI Sigma
+    //----------------------------------
+
+    siSigmaChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "SI Sigma",
+
+        data.map(i=>
+          number(i.siSigmaValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // SI Híbrido
+    //----------------------------------
+
+    siHybridChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "SI Híbrido",
+
+        data.map(i=>
+          number(i.siHybridValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // R²
+    //----------------------------------
+
+    r2Chart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "R²",
+
+        data.map(i=>
+          number(i.r2Value)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // Canopy Instantâneo
+    //----------------------------------
+
+    canopyInstantChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Canopy",
+
+        data.map(i=>
+          number(i.canopyInstantValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
+    },
+
+    //----------------------------------
+    // Canopy Diário
+    //----------------------------------
+
+    canopyDailyChart:{
+
+      data:buildLineChartData(
+
+        labels,
+
+        "Canopy Diário",
+
+        data.map(i=>
+          number(i.canopyDailyValue)
+        )
+
+      ),
+
+      config:buildLineChartConfig()
+
     }
+
   };
+
 }

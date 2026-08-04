@@ -1,30 +1,30 @@
-import { calcStomatalThresholds, calcKsSto } from "./irrigationCalc";
+// stressMonitor.js
 
-// Hydric Stress Monitor
-export function checkHydricStress(Dr, DZtop, TAW, psto) {
-  // The layer with LESS depletion dominates (AquaCrop logic)
-  const D = Math.min(Dr, DZtop);
+export function calcKsFromSoilMoisture(
+  soilMoisture,
+  fieldCapacity = 100,
+  wiltingPoint = 30
+) {
 
-  const { upper, lower } = calcStomatalThresholds(TAW, psto);
-  const Ks = calcKsSto(D, upper, lower);
+  const Ks =
+    (soilMoisture - wiltingPoint) /
+    (fieldCapacity - wiltingPoint);
 
-  let status = "Sem Stress";
-  let recommendedAction = "Nenhuma ação necessária.";
+  return Math.max(
+    0,
+    Math.min(1, Ks)
+  );
+}
 
-  if (Ks < 1 && Ks > 0.3) {
-    status = "Stress Moderado";
-    recommendedAction = "Considere irrigar nas próximas horas.";
+export function getStressStatus(Ks) {
+
+  if (Ks >= 0.8) {
+    return "Sem Stress";
   }
 
-  if (Ks <= 0.3) {
-    status = "Stress Severo";
-    recommendedAction = "⚠️ Irrigação URGENTE!";
+  if (Ks >= 0.5) {
+    return "Stress Moderado";
   }
 
-  return {
-    status,
-    Ks,
-    recommendedAction,
-    depletionUsed: D
-  };
+  return "Stress Severo";
 }
